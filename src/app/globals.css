@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --wall-border: #06305C;
+    --wall-border-highlight: #2585E8;
+    --wall-border-default-btn: #06305C;
+    --wall-border-input: #B1D5FF;
+    --wall-text-body: #1E1E1E;
+    --wall-text-heading: #1E1E1E;
+    --wall-text-light: #FFFFFF;
+    --wall-text-muted: #466482;
+    --wall-text-link: #2585E8;
+    --wall-btn-dark-text: #06305C;
+    --wall-btn-white-text: #FFFFFF;
+    --wall-bg-input: #F8F9FB;
+    --wall-bg-blue: #2585E8;
+    --wall-bg-header: #2585E8;
+
+    --background: 0 0% 100%;
+    --foreground: 0 0% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 12%;
+    --primary: 210 81% 53%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 213 33% 97%;
+    --secondary-foreground: 211 88% 19%;
+    --muted: 213 33% 97%;
+    --muted-foreground: 210 30% 39%;
+    --accent: 210 81% 53%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 211 88% 19%;
+    --input: 212 100% 85%;
+    --ring: 210 81% 53%;
+    --radius: 0.75rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    background-color: #ffffff;
+    color: var(--wall-text-body);
+    @apply antialiased;
+  }
+}
