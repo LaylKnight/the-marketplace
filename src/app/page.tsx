@@ -1,5 +1,5 @@
-import { WallBoard } from "@/components/wall/wall-board";
+import { MarketplaceBrowser } from "@/components/marketplace/marketplace-browser";
 
 export default function HomePage() {
-  return <WallBoard />;
+  return <MarketplaceBrowser initialCategorySlug={null} />;
 }

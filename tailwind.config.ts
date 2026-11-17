@@ -11,8 +11,8 @@ const config: Config = {
     extend: {
       fontFamily: {
         hand: ['"Fredoka"', "system-ui", "-apple-system", "sans-serif"],
-        display: ['"Fredoka"', "system-ui", "-apple-system", "sans-serif"],
-        sans: ['"Fredoka"', "system-ui", "-apple-system", "sans-serif"],
+        display: ['"Geist"', "system-ui", "-apple-system", "sans-serif"],
+        sans: ['"Geist"', "system-ui", "-apple-system", "sans-serif"],
       },
       colors: {
         wall: {

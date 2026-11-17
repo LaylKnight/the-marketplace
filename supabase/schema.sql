@@ -1,79 +1,112 @@
--- ============================================================================
--- 2008-Style Facebook Wall — Supabase Schema
--- Matches: public.posts (id, user_id, author_name, body, photo_url, created_at)
--- ============================================================================
+-- Facebook Marketplace Clone - Supabase Schema
+-- Run this in your Supabase SQL Editor
 
-create extension if not exists "pgcrypto";
+-- Create listings table
+CREATE TABLE IF NOT EXISTS listings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title VARCHAR(255) NOT NULL,
+  description TEXT,
+  price DECIMAL(10,2) NOT NULL,
+  category VARCHAR(100) NOT NULL,
+  seller_name VARCHAR(255) NOT NULL DEFAULT 'Marketplace Seller',
+  seller_email VARCHAR(255) NOT NULL,
+  image_url TEXT,
+  location VARCHAR(255) DEFAULT 'Palo Alto, CA',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- 1. "posts" table storing every entry
-create table if not exists public.posts (
-  id uuid not null default gen_random_uuid (),
-  user_id uuid null,
-  author_name text not null default 'Greg Wientjes',
-  body text null,
-  created_at timestamp with time zone null default now(),
-  photo_url text null,
-  constraint posts_pkey primary key (id),
-  constraint posts_body_check check ((char_length(body) <= 280)),
-  constraint posts_photo_url_check check ((photo_url is null or photo_url ~* '^https?://' or photo_url ~* '^\["https?://'))
-) TABLESPACE pg_default;
+-- Create messages table
+CREATE TABLE IF NOT EXISTS messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  listing_id UUID REFERENCES listings(id) ON DELETE CASCADE,
+  buyer_email VARCHAR(255) NOT NULL,
+  seller_email VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
 
--- If the table already exists without author_name, add it safely:
-alter table public.posts
-  add column if not exists author_name text not null default 'Greg Wientjes';
+-- Create storage bucket for listing images
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('listing-images', 'listing-images', true)
+ON CONFLICT (id) DO NOTHING;
 
--- Index for fast reverse-chronological feed queries (newest first)
-create index if not exists posts_created_at_idx on public.posts (created_at desc);
+-- Create policy for listing images storage
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can upload listing images' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Anyone can upload listing images" ON storage.objects
+    FOR INSERT WITH CHECK (bucket_id = 'listing-images');
+  END IF;
 
--- 2. Enable Row Level Security (No login required — public read & insert)
-alter table public.posts enable row level security;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can view listing images' AND tablename = 'objects'
+  ) THEN
+    CREATE POLICY "Anyone can view listing images" ON storage.objects
+    FOR SELECT USING (bucket_id = 'listing-images');
+  END IF;
+END $$;
 
-create policy "Anyone can view posts"
-  on public.posts
-  for select
-  to anon, authenticated
-  using (true);
+-- Create indexes for better performance
+CREATE INDEX IF NOT EXISTS idx_listings_category ON listings(category);
+CREATE INDEX IF NOT EXISTS idx_listings_created_at ON listings(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_messages_listing_id ON messages(listing_id);
 
-create policy "Anyone can insert posts (280 char max)"
-  on public.posts
-  for insert
-  to anon, authenticated
-  with check (body is null or char_length(body) <= 280);
+-- Enable Row Level Security (RLS)
+ALTER TABLE listings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 
--- 3. Enable Realtime on the posts table for live feed updates
-alter publication supabase_realtime add table public.posts;
+-- Create policies for listings (anyone can read, anyone can insert)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can view listings' AND tablename = 'listings'
+  ) THEN
+    CREATE POLICY "Anyone can view listings" ON listings FOR SELECT USING (true);
+  END IF;
 
--- 4. Storage bucket for post photo uploads (5 MB max, raster images only)
-insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
-values (
-  'wall-images',
-  'wall-images',
-  true,
-  5242880,
-  array['image/png', 'image/jpeg', 'image/webp', 'image/gif']
-)
-on conflict (id) do update
-set
-  public = excluded.public,
-  file_size_limit = excluded.file_size_limit,
-  allowed_mime_types = excluded.allowed_mime_types;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can create listings' AND tablename = 'listings'
+  ) THEN
+    CREATE POLICY "Anyone can create listings" ON listings FOR INSERT WITH CHECK (true);
+  END IF;
 
-create policy "Public read access for wall images"
-  on storage.objects for select
-  to public
-  using (bucket_id = 'wall-images');
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Users can update their own listings' AND tablename = 'listings'
+  ) THEN
+    CREATE POLICY "Users can update their own listings" ON listings FOR UPDATE
+    USING (seller_email = current_setting('request.jwt.claims', true)::json->>'email');
+  END IF;
+END $$;
 
-create policy "Public upload access for wall images"
-  on storage.objects for insert
-  to public
-  with check (bucket_id = 'wall-images');
+-- Create policies for messages (anyone can read and insert)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can view messages' AND tablename = 'messages'
+  ) THEN
+    CREATE POLICY "Anyone can view messages" ON messages FOR SELECT USING (true);
+  END IF;
 
--- 5. Seed initial 2008 Wall posts (matching reference UI)
-insert into public.posts (author_name, body, created_at)
-values
-  ('Anna', 'Hey Greg, did you debug your coffee maker yet? Last cup tasted like JavaScript errors.', now() - interval '5 minutes'),
-  ('Adelaida', 'Greg, saw your last coding session—pretty sure you broke Stack Overflow again! 🚨', now() - interval '22 minutes'),
-  ('Juho', 'Greg, are you still coding in pajamas, or have you upgraded to full-time sweatpants mode?', now() - interval '1 hour'),
-  ('Maija', 'Greg, rumor has it your computer has more stickers than code running on it. Confirm?', now() - interval '3 hours'),
-  ('Alex', 'Yo Greg, just pulled an all-nighter on the assignment. Turns out sleep deprivation doesn’t improve coding skills. Weird!', now() - interval '6 hours'),
-  ('Sheryl', 'Greg, when are we gonna deploy your latest dance moves to production? #AgileDancer', now() - interval '1 day');
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can create messages' AND tablename = 'messages'
+  ) THEN
+    CREATE POLICY "Anyone can create messages" ON messages FOR INSERT WITH CHECK (true);
+  END IF;
+END $$;
+
+-- Create function to update updated_at timestamp
+CREATE OR REPLACE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Create trigger to automatically update updated_at
+DROP TRIGGER IF EXISTS update_listings_updated_at ON listings;
+CREATE TRIGGER update_listings_updated_at BEFORE UPDATE ON listings
+FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
