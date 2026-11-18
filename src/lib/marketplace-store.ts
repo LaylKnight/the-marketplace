@@ -33,6 +33,7 @@ export interface CreateListingInput {
 
 export interface CreateMessageInput {
   listing_id: string;
+  listing_title: string;
   buyer_email: string;
   seller_email: string;
   message: string;
@@ -47,8 +48,31 @@ export interface MarketplaceMessage {
   created_at: string;
 }
 
+export interface MarketplaceNotification {
+  id: string;
+  listing_id: string;
+  message_id: string | null;
+  seller_email: string;
+  listing_title: string;
+  notice: string;
+  is_read: boolean;
+  created_at: string;
+}
+
+export const DEFAULT_MESSAGE_NOTICE =
+  "Someone sent you a message, check your email to start a conversation.";
+export const NOTIFICATIONS_UPDATED_EVENT = "marketplace:notifications-updated";
+
+function emitNotificationsUpdated(): void {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(NOTIFICATIONS_UPDATED_EVENT));
+  }
+}
+
 const LISTINGS_STORAGE_KEY = "marketplace_listings_v1";
 const MESSAGES_STORAGE_KEY = "marketplace_messages_v1";
+const NOTIFICATIONS_STORAGE_KEY = "marketplace_notifications_v1";
+const ACTIVE_SELLER_EMAIL_KEY = "marketplace_active_seller_email_v1";
 
 const rawSupabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim() || "";
 const supabaseUrl = rawSupabaseUrl
@@ -432,6 +456,7 @@ export async function createListing(
       };
     }
 
+    setSavedSellerEmail(sellerEmail);
     return {
       listing: normalizeListingRow(data as Record<string, unknown>),
       error: null,
@@ -454,12 +479,291 @@ export async function createListing(
 
   const existing = readLocalListings();
   writeLocalListings([newListing, ...existing]);
+  setSavedSellerEmail(sellerEmail);
   return { listing: newListing, error: null };
+}
+
+export interface UpdateListingInput {
+  title: string;
+  description: string;
+  price: number;
+  category: string;
+  seller_email?: string;
+  location?: string;
+  imageFile?: File | null;
+  removeImage?: boolean;
+  existingImageUrl?: string | null;
+}
+
+function extractStoragePathFromPublicUrl(
+  imageUrl?: string | null
+): string | null {
+  if (!imageUrl) return null;
+  const marker = `/object/public/${listingStorageBucket}/`;
+  const idx = imageUrl.indexOf(marker);
+  if (idx === -1) return null;
+  const rawPath = imageUrl.slice(idx + marker.length).split("?")[0];
+  return rawPath ? decodeURIComponent(rawPath) : null;
+}
+
+async function removeStorageImageByUrl(
+  supabase: SupabaseClient,
+  imageUrl?: string | null
+): Promise<void> {
+  const storagePath = extractStoragePathFromPublicUrl(imageUrl);
+  if (!storagePath) return;
+  await supabase.storage.from(listingStorageBucket).remove([storagePath]);
+}
+
+export async function updateListing(
+  id: string,
+  input: UpdateListingInput
+): Promise<{ listing: Listing | null; error: string | null }> {
+  const title = sanitizeTextInput(input.title).trim();
+  const description = sanitizeTextInput(input.description).trim();
+  const category = sanitizeTextInput(input.category).trim();
+  const location =
+    sanitizeTextInput(input.location ?? "Palo Alto, CA").trim() ||
+    "Palo Alto, CA";
+
+  if (!title) return { listing: null, error: "Title is required." };
+  if (!Number.isFinite(input.price) || input.price < 0) {
+    return { listing: null, error: "Please enter a valid price." };
+  }
+  if (!category) return { listing: null, error: "Category is required." };
+
+  const supabase = getSupabaseClient();
+  let nextImageUrl: string | null = input.removeImage
+    ? null
+    : (input.existingImageUrl ?? null);
+
+  if (input.imageFile) {
+    const validation = await validateImageFile(input.imageFile);
+    if (!validation.valid) {
+      return { listing: null, error: validation.error };
+    }
+
+    if (supabase) {
+      try {
+        const { blob, ext, contentType } = await reencodeSafeImageBlob(
+          input.imageFile,
+          validation.mime
+        );
+        const filePath = `listings/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from(listingStorageBucket)
+          .upload(filePath, blob, {
+            contentType,
+            upsert: false,
+          });
+
+        if (uploadError) {
+          return {
+            listing: null,
+            error: `Image upload failed: ${uploadError.message}`,
+          };
+        }
+
+        const { data: publicUrlData } = supabase.storage
+          .from(listingStorageBucket)
+          .getPublicUrl(filePath);
+
+        nextImageUrl = publicUrlData.publicUrl;
+      } catch (err) {
+        return {
+          listing: null,
+          error:
+            err instanceof Error ? err.message : "Failed to process image.",
+        };
+      }
+    } else {
+      nextImageUrl = await fileToCompressedDataUrl(
+        input.imageFile,
+        validation.mime
+      );
+    }
+  }
+
+  if (supabase) {
+    const updatePayload: Record<string, unknown> = {
+      title,
+      description: description || null,
+      price: Number(input.price.toFixed(2)),
+      category,
+      location,
+      image_url: nextImageUrl,
+    };
+    if (input.seller_email?.trim()) {
+      updatePayload.seller_email = sanitizeTextInput(input.seller_email).trim();
+    }
+
+    const { data, error } = await supabase
+      .from("listings")
+      .update(updatePayload)
+      .eq("id", id)
+      .select(
+        "id, title, description, price, category, seller_name, seller_email, image_url, location, created_at, updated_at"
+      )
+      .single();
+
+    if (error) {
+      return {
+        listing: null,
+        error: `Failed to update listing: ${error.message}`,
+      };
+    }
+
+    if (
+      (input.imageFile || input.removeImage) &&
+      input.existingImageUrl &&
+      input.existingImageUrl !== nextImageUrl
+    ) {
+      await removeStorageImageByUrl(supabase, input.existingImageUrl);
+    }
+
+    return {
+      listing: normalizeListingRow(data as Record<string, unknown>),
+      error: null,
+    };
+  }
+
+  // LocalStorage fallback
+  const existing = readLocalListings();
+  let updatedItem: Listing | null = null;
+  const nextList = existing.map((item) => {
+    if (item.id !== id) return item;
+    updatedItem = {
+      ...item,
+      title,
+      description: description || null,
+      price: Number(input.price.toFixed(2)),
+      category,
+      location,
+      image_url: nextImageUrl,
+      updated_at: new Date().toISOString(),
+    };
+    return updatedItem;
+  });
+
+  if (!updatedItem) {
+    return { listing: null, error: "Listing not found." };
+  }
+
+  writeLocalListings(nextList);
+  return { listing: updatedItem, error: null };
+}
+
+export async function deleteListing(
+  id: string,
+  imageUrl?: string | null
+): Promise<{ success: boolean; error: string | null }> {
+  const supabase = getSupabaseClient();
+
+  if (supabase) {
+    let targetImageUrl = imageUrl;
+    if (targetImageUrl === undefined) {
+      const { data: existingRow } = await supabase
+        .from("listings")
+        .select("image_url")
+        .eq("id", id)
+        .maybeSingle();
+      targetImageUrl =
+        typeof existingRow?.image_url === "string"
+          ? existingRow.image_url
+          : null;
+    }
+
+    const { error } = await supabase.from("listings").delete().eq("id", id);
+    if (error) {
+      return {
+        success: false,
+        error: `Failed to delete listing: ${error.message}`,
+      };
+    }
+
+    await removeStorageImageByUrl(supabase, targetImageUrl);
+    emitNotificationsUpdated();
+    return { success: true, error: null };
+  }
+
+  // LocalStorage fallback
+  const existing = readLocalListings();
+  writeLocalListings(existing.filter((item) => item.id !== id));
+
+  if (typeof window !== "undefined") {
+    try {
+      const rawNotifs = window.localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      if (rawNotifs) {
+        const list: MarketplaceNotification[] = JSON.parse(rawNotifs);
+        window.localStorage.setItem(
+          NOTIFICATIONS_STORAGE_KEY,
+          JSON.stringify(list.filter((n) => n.listing_id !== id))
+        );
+        emitNotificationsUpdated();
+      }
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  return { success: true, error: null };
+}
+
+export function getSavedSellerEmail(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(ACTIVE_SELLER_EMAIL_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function setSavedSellerEmail(email: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const trimmed = email.trim();
+    if (trimmed) {
+      window.localStorage.setItem(ACTIVE_SELLER_EMAIL_KEY, trimmed);
+    } else {
+      window.localStorage.removeItem(ACTIVE_SELLER_EMAIL_KEY);
+    }
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+async function triggerSellerEmail(payload: {
+  listingId: string;
+  listingTitle: string;
+  buyerEmail: string;
+  sellerEmail: string;
+  message: string;
+}): Promise<boolean> {
+  try {
+    const listingUrl =
+      typeof window !== "undefined"
+        ? `${window.location.origin}/item/${payload.listingId}`
+        : undefined;
+    const response = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...payload,
+        listingUrl,
+      }),
+    });
+    if (!response.ok) return false;
+    const data = (await response.json()) as { sent?: boolean };
+    return Boolean(data?.sent);
+  } catch {
+    return false;
+  }
 }
 
 export async function sendMessageToSeller(
   input: CreateMessageInput
-): Promise<{ success: boolean; error: string | null }> {
+): Promise<{ success: boolean; emailSent?: boolean; error: string | null }> {
   const buyerEmail = sanitizeTextInput(input.buyer_email).trim();
   const message = sanitizeTextInput(input.message).trim();
 
@@ -475,12 +779,16 @@ export async function sendMessageToSeller(
 
   const supabase = getSupabaseClient();
   if (supabase) {
-    const { error } = await supabase.from("messages").insert({
-      listing_id: input.listing_id,
-      buyer_email: buyerEmail,
-      seller_email: input.seller_email,
-      message,
-    });
+    const { data: msgData, error } = await supabase
+      .from("messages")
+      .insert({
+        listing_id: input.listing_id,
+        buyer_email: buyerEmail,
+        seller_email: input.seller_email,
+        message,
+      })
+      .select("id")
+      .single();
 
     if (error) {
       return {
@@ -489,16 +797,36 @@ export async function sendMessageToSeller(
       };
     }
 
-    return { success: true, error: null };
+    await supabase.from("notifications").insert({
+      listing_id: input.listing_id,
+      message_id: msgData?.id ?? null,
+      seller_email: input.seller_email,
+      listing_title: sanitizeTextInput(input.listing_title).trim() || "Listing",
+      notice: DEFAULT_MESSAGE_NOTICE,
+      is_read: false,
+    });
+
+    const emailSent = await triggerSellerEmail({
+      listingId: input.listing_id,
+      listingTitle:
+        sanitizeTextInput(input.listing_title).trim() || "Listing",
+      buyerEmail,
+      sellerEmail: input.seller_email,
+      message,
+    });
+
+    emitNotificationsUpdated();
+    return { success: true, emailSent, error: null };
   }
 
   // LocalStorage fallback
   if (typeof window !== "undefined") {
     try {
+      const msgId = `msg-${Date.now()}`;
       const raw = window.localStorage.getItem(MESSAGES_STORAGE_KEY);
       const existing: MarketplaceMessage[] = raw ? JSON.parse(raw) : [];
       existing.unshift({
-        id: `msg-${Date.now()}`,
+        id: msgId,
         listing_id: input.listing_id,
         buyer_email: buyerEmail,
         seller_email: input.seller_email,
@@ -509,10 +837,148 @@ export async function sendMessageToSeller(
         MESSAGES_STORAGE_KEY,
         JSON.stringify(existing)
       );
+
+      const rawNotifs = window.localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+      const existingNotifs: MarketplaceNotification[] = rawNotifs
+        ? JSON.parse(rawNotifs)
+        : [];
+      existingNotifs.unshift({
+        id: `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        listing_id: input.listing_id,
+        message_id: msgId,
+        seller_email: input.seller_email,
+        listing_title:
+          sanitizeTextInput(input.listing_title).trim() || "Listing",
+        notice: DEFAULT_MESSAGE_NOTICE,
+        is_read: false,
+        created_at: new Date().toISOString(),
+      });
+      window.localStorage.setItem(
+        NOTIFICATIONS_STORAGE_KEY,
+        JSON.stringify(existingNotifs)
+      );
+      emitNotificationsUpdated();
     } catch {
       // Ignore storage quota errors in demo mode
     }
   }
 
-  return { success: true, error: null };
+  const emailSent = await triggerSellerEmail({
+    listingId: input.listing_id,
+    listingTitle: sanitizeTextInput(input.listing_title).trim() || "Listing",
+    buyerEmail,
+    sellerEmail: input.seller_email,
+    message,
+  });
+
+  return { success: true, emailSent, error: null };
+}
+
+export async function fetchNotifications(
+  sellerEmail?: string | null
+): Promise<{ notifications: MarketplaceNotification[]; error: string | null }> {
+  const emailFilter = sellerEmail?.trim() || "";
+  const supabase = getSupabaseClient();
+
+  if (supabase) {
+    let query = supabase
+      .from("notifications")
+      .select(
+        "id, listing_id, message_id, seller_email, listing_title, notice, is_read, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if (emailFilter) {
+      query = query.ilike("seller_email", emailFilter);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      return { notifications: [], error: error.message };
+    }
+
+    return {
+      notifications: (data ?? []) as MarketplaceNotification[],
+      error: null,
+    };
+  }
+
+  if (typeof window === "undefined") {
+    return { notifications: [], error: null };
+  }
+
+  try {
+    const raw = window.localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    let list: MarketplaceNotification[] = raw ? JSON.parse(raw) : [];
+    if (emailFilter) {
+      list = list.filter(
+        (item) => item.seller_email.toLowerCase() === emailFilter.toLowerCase()
+      );
+    }
+    return { notifications: list.slice(0, 25), error: null };
+  } catch {
+    return { notifications: [], error: null };
+  }
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const supabase = getSupabaseClient();
+  if (supabase) {
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
+    return;
+  }
+
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    const list: MarketplaceNotification[] = raw ? JSON.parse(raw) : [];
+    const updated = list.map((n) => (n.id === id ? { ...n, is_read: true } : n));
+    window.localStorage.setItem(
+      NOTIFICATIONS_STORAGE_KEY,
+      JSON.stringify(updated)
+    );
+  } catch {
+    // Ignore storage errors
+  }
+}
+
+export async function markAllNotificationsRead(
+  sellerEmail?: string | null
+): Promise<void> {
+  const emailFilter = sellerEmail?.trim() || "";
+  const supabase = getSupabaseClient();
+
+  if (supabase) {
+    let query = supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("is_read", false);
+    if (emailFilter) {
+      query = query.ilike("seller_email", emailFilter);
+    }
+    await query;
+    return;
+  }
+
+  if (typeof window === "undefined") return;
+  try {
+    const raw = window.localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+    const list: MarketplaceNotification[] = raw ? JSON.parse(raw) : [];
+    const updated = list.map((n) => {
+      if (
+        !emailFilter ||
+        n.seller_email.toLowerCase() === emailFilter.toLowerCase()
+      ) {
+        return { ...n, is_read: true };
+      }
+      return n;
+    });
+    window.localStorage.setItem(
+      NOTIFICATIONS_STORAGE_KEY,
+      JSON.stringify(updated)
+    );
+  } catch {
+    // Ignore storage errors
+  }
 }

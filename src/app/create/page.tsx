@@ -24,7 +24,7 @@ const LISTING_TYPES = [
   {
     title: "Create multiple listings",
     description: "Quickly create listings for multiple items to sell.",
-    href: "/create/item",
+    href: "/create/item?mode=multiple",
     icon: Layers,
   },
   {

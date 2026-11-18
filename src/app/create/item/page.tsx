@@ -6,22 +6,36 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   ArrowLeft,
+  CheckCircle2,
   ImagePlus,
   Loader2,
   MapPin,
   Trash2,
-  User,
 } from "lucide-react";
 import {
   MARKETPLACE_CATEGORIES,
   getCategoryBySlug,
 } from "@/lib/categories";
-import { createListing, formatPrice } from "@/lib/marketplace-store";
+import {
+  createListing,
+  fetchListingById,
+  formatPrice,
+  getSavedSellerEmail,
+  updateListing,
+} from "@/lib/marketplace-store";
 import { MAX_IMAGE_SIZE_LABEL, validateImageFile } from "@/lib/security";
+
+const LOGGED_IN_SELLER = {
+  name: "Greg Wientjes",
+  avatar: "/greg-profile.png",
+};
 
 function CreateItemFormInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const editListingId = searchParams.get("edit");
+  const isEditMode = Boolean(editListingId);
+  const isMultipleMode = !isEditMode && searchParams.get("mode") === "multiple";
   const initialCategorySlug = searchParams.get("category");
   const initialCategory =
     getCategoryBySlug(initialCategorySlug)?.name ?? "Electronics";
@@ -29,23 +43,69 @@ function CreateItemFormInner() {
   const [title, setTitle] = React.useState("");
   const [price, setPrice] = React.useState("");
   const [category, setCategory] = React.useState(initialCategory);
-  const [sellerName, setSellerName] = React.useState("");
   const [sellerEmail, setSellerEmail] = React.useState("");
   const [location, setLocation] = React.useState("Palo Alto, CA");
   const [description, setDescription] = React.useState("");
   const [imageFile, setImageFile] = React.useState<File | null>(null);
+  const [existingImageUrl, setExistingImageUrl] = React.useState<string | null>(
+    null
+  );
+  const [removeExistingImage, setRemoveExistingImage] = React.useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(
     null
   );
+  const [isLoadingExisting, setIsLoadingExisting] =
+    React.useState(isEditMode);
   const [isDragging, setIsDragging] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [publishedListings, setPublishedListings] = React.useState<
+    Array<{ id: string; title: string; price: number }>
+  >([]);
 
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
+    if (!editListingId) {
+      const saved = getSavedSellerEmail();
+      if (saved) setSellerEmail(saved);
+      setIsLoadingExisting(false);
+      return;
+    }
+
+    let cancelled = false;
+    async function loadExisting() {
+      setIsLoadingExisting(true);
+      const result = await fetchListingById(editListingId!);
+      if (cancelled) return;
+      if (result.error || !result.listing) {
+        setError(result.error ?? "Listing not found.");
+        setIsLoadingExisting(false);
+        return;
+      }
+
+      const item = result.listing;
+      setTitle(item.title);
+      setPrice(String(item.price));
+      setCategory(item.category);
+      setSellerEmail(item.seller_email || "");
+      setLocation(item.location || "Palo Alto, CA");
+      setDescription(item.description ?? "");
+      setExistingImageUrl(item.image_url);
+      setImagePreviewUrl(item.image_url);
+      setRemoveExistingImage(false);
+      setIsLoadingExisting(false);
+    }
+
+    void loadExisting();
     return () => {
-      if (imagePreviewUrl) {
+      cancelled = true;
+    };
+  }, [editListingId]);
+
+  React.useEffect(() => {
+    return () => {
+      if (imagePreviewUrl?.startsWith("blob:")) {
         URL.revokeObjectURL(imagePreviewUrl);
       }
     };
@@ -61,20 +121,24 @@ function CreateItemFormInner() {
       return;
     }
 
-    if (imagePreviewUrl) {
+    if (imagePreviewUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(imagePreviewUrl);
     }
 
     setImageFile(file);
+    setRemoveExistingImage(false);
     setImagePreviewUrl(URL.createObjectURL(file));
   }
 
   function handleClearImage() {
-    if (imagePreviewUrl) {
+    if (imagePreviewUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(imagePreviewUrl);
     }
     setImageFile(null);
     setImagePreviewUrl(null);
+    if (existingImageUrl) {
+      setRemoveExistingImage(true);
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -100,22 +164,41 @@ function CreateItemFormInner() {
       setError("Please enter a valid non-negative price.");
       return;
     }
-    if (!sellerName.trim()) {
-      setError("Please enter your display name.");
-      return;
-    }
     if (!sellerEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sellerEmail)) {
       setError("Please enter a valid email address.");
       return;
     }
 
     setIsSubmitting(true);
+    if (isEditMode && editListingId) {
+      const result = await updateListing(editListingId, {
+        title: title.trim(),
+        description: description.trim(),
+        price: parsedPrice,
+        category,
+        seller_email: sellerEmail.trim(),
+        location: location.trim() || "Palo Alto, CA",
+        imageFile,
+        removeImage: removeExistingImage,
+        existingImageUrl,
+      });
+      setIsSubmitting(false);
+
+      if (result.error || !result.listing) {
+        setError(result.error ?? "Failed to update listing.");
+        return;
+      }
+
+      router.push(`/item/${result.listing.id}`);
+      return;
+    }
+
     const result = await createListing({
       title: title.trim(),
       description: description.trim(),
       price: parsedPrice,
       category,
-      seller_name: sellerName.trim(),
+      seller_name: LOGGED_IN_SELLER.name,
       seller_email: sellerEmail.trim(),
       location: location.trim() || "Palo Alto, CA",
       imageFile,
@@ -124,6 +207,22 @@ function CreateItemFormInner() {
 
     if (result.error || !result.listing) {
       setError(result.error ?? "Failed to create listing.");
+      return;
+    }
+
+    if (isMultipleMode) {
+      setPublishedListings((prev) => [
+        {
+          id: result.listing!.id,
+          title: result.listing!.title,
+          price: result.listing!.price,
+        },
+        ...prev,
+      ]);
+      setTitle("");
+      setPrice("");
+      setDescription("");
+      handleClearImage();
       return;
     }
 
@@ -137,8 +236,8 @@ function CreateItemFormInner() {
 
   return (
     <div className="min-h-screen bg-[#F0F2F5] flex flex-col lg:flex-row">
-      {/* Left Form Column matching Mockups 3 & 4 */}
-      <aside className="w-full lg:w-[380px] shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-[#CED0D4] p-5 flex flex-col">
+      {/* Left Form Column */}
+      <aside className="w-full lg:w-[440px] xl:w-[480px] shrink-0 bg-white border-b lg:border-b-0 lg:border-r border-[#CED0D4] p-6 flex flex-col">
         <div className="flex items-center justify-between pb-4 border-b border-[#CED0D4]/70">
           <Link href="/" className="flex items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1877F2] text-white font-bold text-xl leading-none">
@@ -149,7 +248,7 @@ function CreateItemFormInner() {
             </span>
           </Link>
           <Link
-            href="/create"
+            href={isEditMode && editListingId ? `/item/${editListingId}` : "/create"}
             className="inline-flex items-center gap-1 text-xs font-medium text-[#65676B] hover:text-[#1C1E21]"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
@@ -157,10 +256,67 @@ function CreateItemFormInner() {
           </Link>
         </div>
 
-        <h1 className="mt-4 text-lg font-bold text-[#1C1E21]">Item for sale</h1>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg font-bold text-[#1C1E21]">
+              {isEditMode
+                ? "Edit listing"
+                : isMultipleMode
+                  ? "Create multiple listings"
+                  : "Item for sale"}
+            </h1>
+            {isMultipleMode && (
+              <p className="text-xs text-[#65676B]">
+                Publish items back-to-back without leaving this page.
+              </p>
+            )}
+          </div>
+          <Link
+            href="/profile"
+            className="flex items-center gap-2 rounded-full bg-[#F0F2F5] px-2.5 py-1 hover:bg-[#E4E6EB] transition-colors shrink-0"
+          >
+            <img
+              src={LOGGED_IN_SELLER.avatar}
+              alt={LOGGED_IN_SELLER.name}
+              className="h-6 w-6 rounded-full object-cover"
+            />
+            <span className="text-xs font-semibold text-[#1C1E21]">
+              {LOGGED_IN_SELLER.name}
+            </span>
+          </Link>
+        </div>
+
+        {isMultipleMode && publishedListings.length > 0 && (
+          <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 space-y-1.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 font-semibold">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Published {publishedListings.length}{" "}
+                {publishedListings.length === 1 ? "listing" : "listings"}!
+              </span>
+              <Link
+                href="/"
+                className="font-semibold text-[#1877F2] hover:underline"
+              >
+                View all
+              </Link>
+            </div>
+            <p className="text-emerald-700 truncate">
+              Latest:{" "}
+              <Link
+                href={`/item/${publishedListings[0].id}`}
+                className="font-semibold underline"
+              >
+                {publishedListings[0].title}
+              </Link>{" "}
+              ({formatPrice(publishedListings[0].price)}) — add your next item
+              below.
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="mt-4 space-y-3.5 flex-1">
-          {/* Drag & Drop Photo Upload */}
+          {/* Drag & Drop Photo Upload (compact width) */}
           <div>
             <label className="block text-xs font-semibold text-[#65676B] mb-1.5">
               Photo
@@ -181,7 +337,7 @@ function CreateItemFormInner() {
                   fileInputRef.current?.click();
                 }
               }}
-              className={`relative flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-6 text-center cursor-pointer transition-colors ${
+              className={`relative w-full max-w-[260px] flex flex-col items-center justify-center rounded-xl border-2 border-dashed px-4 py-5 text-center cursor-pointer transition-colors ${
                 isDragging
                   ? "border-[#1877F2] bg-[#E7F3FF]"
                   : "border-[#CED0D4] bg-[#F8F9FB] hover:border-[#1877F2]"
@@ -296,33 +452,13 @@ function CreateItemFormInner() {
             </div>
           </div>
 
-          {/* Seller Display Name (public) */}
-          <div>
-            <label
-              htmlFor="seller-name"
-              className="block text-xs font-semibold text-[#65676B] mb-1"
-            >
-              Seller Name (shown publicly) *
-            </label>
-            <input
-              id="seller-name"
-              type="text"
-              required
-              maxLength={80}
-              value={sellerName}
-              onChange={(e) => setSellerName(e.target.value)}
-              placeholder="e.g. Greg Wientjes"
-              className="h-10 w-full rounded-lg border border-[#CED0D4] bg-white px-3 text-sm text-[#1C1E21] focus:border-[#1877F2] focus:outline-none focus:ring-1 focus:ring-[#1877F2]"
-            />
-          </div>
-
-          {/* Seller Email (private) */}
+          {/* Seller Email (private, receives buyer messages) */}
           <div>
             <label
               htmlFor="seller-email"
               className="block text-xs font-semibold text-[#65676B] mb-1"
             >
-              Email (kept private, for buyer messages) *
+              Email (kept private, receives buyer messages) *
             </label>
             <input
               id="seller-email"
@@ -382,24 +518,30 @@ function CreateItemFormInner() {
 
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={isSubmitting || isLoadingExisting}
             className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1877F2] text-sm font-semibold text-white shadow-sm hover:bg-[#166FE5] disabled:opacity-60 transition-colors"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>Publishing...</span>
+                <span>{isEditMode ? "Saving..." : "Publishing..."}</span>
               </>
             ) : (
-              <span>Next</span>
+              <span>
+                {isEditMode
+                  ? "Save changes"
+                  : isMultipleMode
+                    ? "Publish & Add Another"
+                    : "Next"}
+              </span>
             )}
           </button>
         </form>
       </aside>
 
       {/* Right Real-Time Preview Panel matching Mockups 3 & 4 */}
-      <main className="flex-1 p-6 lg:p-10 flex flex-col justify-center">
-        <div className="mx-auto w-full max-w-4xl">
+      <main className="flex-1 p-6 lg:p-8 flex flex-col justify-center">
+        <div className="w-full">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm font-semibold text-[#65676B]">
               Preview
@@ -409,15 +551,27 @@ function CreateItemFormInner() {
             </span>
           </div>
 
-          <div className="overflow-hidden rounded-2xl bg-white border border-[#CED0D4] shadow-sm grid grid-cols-1 md:grid-cols-12">
-            {/* Image Preview */}
-            <div className="md:col-span-7 bg-[#F0F2F5] flex items-center justify-center min-h-[320px] md:min-h-[480px] border-b md:border-b-0 md:border-r border-[#CED0D4]">
+          <div className="overflow-hidden rounded-2xl bg-white border border-[#CED0D4] shadow-sm flex flex-col md:flex-row">
+            {/* Image Preview with blurred background */}
+            <div
+              className={`relative flex-1 overflow-hidden flex items-center justify-center p-6 sm:p-8 min-h-[320px] md:min-h-[540px] border-b md:border-b-0 md:border-r border-[#CED0D4] ${
+                imagePreviewUrl ? "bg-[#18191A]" : "bg-[#F0F2F5]"
+              }`}
+            >
               {imagePreviewUrl ? (
-                <img
-                  src={imagePreviewUrl}
-                  alt="Listing preview"
-                  className="h-full w-full max-h-[540px] object-contain"
-                />
+                <>
+                  <img
+                    src={imagePreviewUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-65 select-none pointer-events-none"
+                  />
+                  <img
+                    src={imagePreviewUrl}
+                    alt="Listing preview"
+                    className="relative z-10 max-h-[440px] max-w-[82%] w-auto object-contain rounded-lg shadow-2xl"
+                  />
+                </>
               ) : (
                 <div className="marketplace-placeholder-pattern flex h-full w-full min-h-[320px] flex-col items-center justify-center p-6 text-center">
                   <ImagePlus className="h-10 w-10 text-[#1877F2]/60 mb-2" />
@@ -429,7 +583,7 @@ function CreateItemFormInner() {
             </div>
 
             {/* Details Preview */}
-            <div className="md:col-span-5 p-6 flex flex-col justify-between">
+            <div className="w-full md:w-[340px] xl:w-[380px] shrink-0 p-6 flex flex-col justify-between">
               <div className="space-y-4">
                 <div>
                   <h2 className="text-2xl font-bold text-[#1C1E21] break-words">
@@ -466,15 +620,17 @@ function CreateItemFormInner() {
                   Seller Information
                 </h3>
                 <div className="mt-2.5 flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#E7F3FF] text-[#1877F2]">
-                    <User className="h-4 w-4" />
-                  </span>
+                  <img
+                    src={LOGGED_IN_SELLER.avatar}
+                    alt={LOGGED_IN_SELLER.name}
+                    className="h-9 w-9 rounded-full object-cover border border-[#CED0D4]"
+                  />
                   <div>
                     <p className="text-sm font-semibold text-[#1C1E21]">
-                      {sellerName.trim() || "Marketplace Seller"}
+                      {LOGGED_IN_SELLER.name}
                     </p>
                     <p className="text-xs text-[#65676B]">
-                      Email kept private
+                      Palo Alto · Seller
                     </p>
                   </div>
                 </div>

@@ -3,7 +3,11 @@
 import * as React from "react";
 import { LayoutGrid, List, AlertCircle } from "lucide-react";
 import { MarketplaceHeader } from "@/components/layout/header";
-import { MarketplaceSidebar } from "@/components/layout/sidebar";
+import {
+  MarketplaceSidebar,
+  type DateListedOption,
+  type SortOption,
+} from "@/components/layout/sidebar";
 import { ItemGrid } from "@/components/marketplace/item-grid";
 import { getCategoryBySlug } from "@/lib/categories";
 import { fetchListings, type Listing } from "@/lib/marketplace-store";
@@ -21,6 +25,10 @@ export function MarketplaceBrowser({
     initialCategorySlug
   );
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [sortBy, setSortBy] = React.useState<SortOption>("newest");
+  const [minPrice, setMinPrice] = React.useState("");
+  const [maxPrice, setMaxPrice] = React.useState("");
+  const [dateListed, setDateListed] = React.useState<DateListedOption>("all");
   const [viewMode, setViewMode] = React.useState<"grid" | "list">("grid");
   const [listings, setListings] = React.useState<Listing[]>([]);
   const [isLoading, setIsLoading] = React.useState(true);
@@ -57,15 +65,59 @@ export function MarketplaceBrowser({
     };
   }, [activeCategory?.name, searchQuery]);
 
+  const filteredListings = React.useMemo(() => {
+    const min = minPrice.trim() !== "" ? Number(minPrice) : null;
+    const max = maxPrice.trim() !== "" ? Number(maxPrice) : null;
+    const now = Date.now();
+    const cutoffMs =
+      dateListed === "24h"
+        ? 24 * 60 * 60 * 1000
+        : dateListed === "7d"
+          ? 7 * 24 * 60 * 60 * 1000
+          : dateListed === "30d"
+            ? 30 * 24 * 60 * 60 * 1000
+            : null;
+
+    const filtered = listings.filter((item) => {
+      if (min !== null && Number.isFinite(min) && item.price < min) {
+        return false;
+      }
+      if (max !== null && Number.isFinite(max) && item.price > max) {
+        return false;
+      }
+      if (cutoffMs !== null) {
+        const age = now - new Date(item.created_at).getTime();
+        if (age > cutoffMs) return false;
+      }
+      return true;
+    });
+
+    if (sortBy === "price-asc") {
+      return [...filtered].sort((a, b) => a.price - b.price);
+    }
+    if (sortBy === "price-desc") {
+      return [...filtered].sort((a, b) => b.price - a.price);
+    }
+    return [...filtered].sort(
+      (a, b) =>
+        new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+  }, [listings, minPrice, maxPrice, dateListed, sortBy]);
+
+  function handleBrowseAll() {
+    setSelectedSlug(null);
+    setSearchQuery("");
+    setMinPrice("");
+    setMaxPrice("");
+    setDateListed("all");
+    setSortBy("newest");
+  }
+
   const heading = activeCategory ? activeCategory.name : "Today's picks";
 
   return (
     <div className="min-h-screen bg-[#F0F2F5]">
-      <MarketplaceHeader
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        showSearch
-      />
+      <MarketplaceHeader />
 
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
         <div className="flex flex-col lg:flex-row gap-6">
@@ -73,6 +125,17 @@ export function MarketplaceBrowser({
             activeCategorySlug={selectedSlug}
             onSelectCategory={(slug) => setSelectedSlug(slug)}
             useLinks={useCategoryLinks}
+            searchQuery={searchQuery}
+            onSearchChange={setSearchQuery}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            minPrice={minPrice}
+            maxPrice={maxPrice}
+            onMinPriceChange={setMinPrice}
+            onMaxPriceChange={setMaxPrice}
+            dateListed={dateListed}
+            onDateListedChange={setDateListed}
+            onBrowseAll={handleBrowseAll}
           />
 
           <section className="flex-1 min-w-0">
@@ -84,7 +147,7 @@ export function MarketplaceBrowser({
                 <p className="text-xs sm:text-sm text-[#65676B]">
                   {isLoading
                     ? "Loading listings..."
-                    : `${listings.length} ${listings.length === 1 ? "listing" : "listings"}${searchQuery ? ` matching "${searchQuery}"` : ""}`}
+                    : `${filteredListings.length} ${filteredListings.length === 1 ? "listing" : "listings"}${searchQuery ? ` matching "${searchQuery}"` : ""}`}
                 </p>
               </div>
 
@@ -129,7 +192,7 @@ export function MarketplaceBrowser({
             )}
 
             <ItemGrid
-              listings={listings}
+              listings={filteredListings}
               isLoading={isLoading}
               viewMode={viewMode}
               emptyTitle={
