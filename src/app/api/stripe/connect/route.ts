@@ -38,7 +38,7 @@ export async function POST(req: Request) {
         controller: {
           fees: { payer: "account" },
           losses: { payments: "stripe" },
-          stripe_dashboard: { type: "express" },
+          stripe_dashboard: { type: "full" },
         },
         capabilities: {
           card_payments: { requested: true },
