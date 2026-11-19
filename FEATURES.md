@@ -47,7 +47,7 @@ A complete reference of every user-facing feature and workflow in the Marketplac
 
 ---
 
-## 4. Create, Batch-Create & Edit Listings (`/create`, `/create/item`)
+## 4. Create & Batch-Create Listings (`/create`, `/create/item`)
 
 ### Choose Listing Type (`/create`)
 - Left sidebar with close (`X`) button, **Choose listing type**, **Your listings**, and expandable **Seller help** tips.
@@ -57,7 +57,7 @@ A complete reference of every user-facing feature and workflow in the Marketplac
   - **Vehicle for sale** → `/create/item?category=vehicles`
   - **Home for sale or rent** → `/create/item?category=property-rentals`
 
-### Listing Editor & Live Preview (`/create/item`)
+### Listing Form & Live Preview (`/create/item`)
 - **Logged-in Seller Header:** Displays **Greg Wientjes** (`/greg-profile.png`) as the active seller.
 - **Compact Drag-and-Drop Photo Uploader:**
   - Supports click-to-browse or drag-and-drop (`PNG`, `JPEG`, `WEBP`, `GIF`, up to 5 MB).
@@ -67,19 +67,13 @@ A complete reference of every user-facing feature and workflow in the Marketplac
 - **Back-to-Back Multiple Listings Mode (`?mode=multiple`):**
   - Button changes to **Publish & Add Another**.
   - Publishes each item to Supabase, displays a session counter + link to the latest listing, clears the form/photo, and lets you immediately add the next item.
-- **Edit Mode (`?edit=[id]`):**
-  - Pre-fills existing title, price, category, seller email, location, description, and photo.
-  - Submitting updates the row in Supabase `listings` and cleans up replaced images in Supabase Storage.
 
 ---
 
-## 5. Listing Detail, Privacy, Delete & Messaging (`/item/[id]`)
+## 5. Listing Detail, Privacy & Messaging (`/item/[id]`)
 
 - **Blurred-Backdrop Photo Stage:** Full-width container with a blurred copy of the listing image behind a centered, shadowed foreground photo, plus a full-page `.fb-shimmer` loading skeleton while loading.
 - **Seller Privacy Protection:** Displays `seller_name` publicly while keeping `seller_email` hidden from the UI.
-- **Edit & Delete Controls:**
-  - **Edit** routes to `/create/item?edit=[id]`.
-  - **Delete** reveals an inline confirmation bar; confirming deletes the listing row (cascading related `messages` and `notifications`) **and** removes the stored image file from the Supabase `listing-images` bucket.
 - **Send Seller a Message:**
   - Collects **Your Email** (`buyer_email`) and **Message**.
   - Saves the message to Supabase `messages`, creates an in-app notice in `notifications`, triggers the real-time bell update, and sends an email to `seller_email` (with `Reply-To` set to `buyer_email`) via `/api/send-email`.

@@ -25,8 +25,8 @@ Built with **Next.js 15 App Router** and TypeScript:
 | `/category/[slug]` | `src/app/category/[slug]/page.tsx` | Dynamic (`await params`) | Category-filtered view for any of the 19 categories |
 | `/category/electronics` | `src/app/category/electronics/page.tsx` | Static | Dedicated Electronics category example route |
 | `/create` | `src/app/create/page.tsx` | Static / Client | Listing type selector |
-| `/create/item` | `src/app/create/item/page.tsx` | Static / Client (`Suspense`) | Create, batch-create (`?mode=multiple`), or edit (`?edit=[id]`) form |
-| `/item/[id]` | `src/app/item/[id]/page.tsx` | Dynamic (`useParams`) | Listing detail, edit/delete actions, and Message Seller |
+| `/create/item` | `src/app/create/item/page.tsx` | Static / Client (`Suspense`) | Create or batch-create (`?mode=multiple`) item form |
+| `/item/[id]` | `src/app/item/[id]/page.tsx` | Dynamic (`useParams`) | Listing detail and Message Seller |
 | `/profile` | `src/app/profile/page.tsx` | Static / Client | Greg Wientjes Seller Profile + active listings |
 | `/api/send-email` | `src/app/api/send-email/route.ts` | Node.js API Route | SMTP email delivery with weekly cap & cooldown |
 
@@ -46,8 +46,6 @@ All Marketplace CRUD, image handling, notification management, and email dispatc
   - `fetchListings({ category, search })`
   - `fetchListingById(id)`
   - `createListing(input)` — validates/re-encodes the photo, uploads to `listing-images`, inserts into `listings`, and saves `seller_email` in `localStorage` for notification filtering.
-  - `updateListing(id, input)` — updates `listings` fields, uploads replacement image if provided, and calls `removeStorageImageByUrl` to delete superseded images from `listing-images`.
-  - `deleteListing(id, imageUrl)` — deletes the `listings` row (cascading `messages` & `notifications`) and removes the image file from Supabase Storage via `extractStoragePathFromPublicUrl`.
 - **Messaging & Notifications:**
   - `sendMessageToSeller(input)` — inserts into `messages`, inserts into `notifications`, triggers `/api/send-email`, and dispatches `NOTIFICATIONS_UPDATED_EVENT` (`marketplace:notifications-updated`) for instant UI updates in the current tab.
   - `fetchNotifications(sellerEmail)`, `markNotificationRead(id)`, `markAllNotificationsRead(sellerEmail)`.

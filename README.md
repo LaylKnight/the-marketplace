@@ -9,25 +9,23 @@ Works out of the box with **Supabase** (PostgreSQL + Storage + Realtime) and aut
 ## Documentation
 
 - **[SETUP.md](./SETUP.md)** — Detailed local setup, Supabase SQL & Storage setup, Gmail SMTP configuration, and Vercel deployment.
-- **[FEATURES.md](./FEATURES.md)** — Complete feature walkthrough (browsing, filtering, live preview creation, batch posting, edit/delete, realtime notifications, and lazy-loading skeletons).
+- **[FEATURES.md](./FEATURES.md)** — Complete feature walkthrough (browsing, filtering, live preview creation, batch posting, realtime notifications, and lazy-loading skeletons).
 - **[DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md)** — Phased architecture, design system, routing strategy, data layer, and security implementation.
 
 ---
 
 ## Core Features
 
-1. **Create, Batch-Create & Edit Listings (`/create`, `/create/item`)**
+1. **Create & Batch-Create Listings (`/create`, `/create/item`)**
    - Drag-and-drop photo upload with magic-byte validation and client-side WebP compression.
    - Real-time split-screen preview synced to your form inputs.
    - **Create multiple listings** mode (`/create/item?mode=multiple`) for back-to-back **Publish & Add Another** workflows.
-   - Full edit support (`/create/item?edit=[id]`).
 2. **Browse, Search & Filter (`/`, `/category/[slug]`, `/category/electronics`)**
    - Sticky left sidebar with **Create new listing** CTA, keyword search, **Browse All**, **Sort by**, **Price (Min/Max)**, **Date listed**, and **19 icon-badged categories**.
    - Responsive 1–5 column **Grid** and **List** views with Facebook-style shimmer skeletons (`LazyImage` & `.fb-shimmer`).
-3. **Listing Detail, Delete & Message Seller (`/item/[id]`)**
+3. **Listing Detail & Message Seller (`/item/[id]`)**
    - Full-width photo stage with a blurred ambient image backdrop behind the centered item photo.
    - Privacy-safe seller display (`seller_name` is shown publicly; `seller_email` is kept private).
-   - **Delete** with confirmation that removes both the database row and the uploaded image in Supabase Storage.
    - **Message Seller** form that saves buyer messages in Supabase `messages`, inserts a `notifications` record, broadcasts real-time updates to the header bell, and emails the seller via `/api/send-email`.
 4. **Seller Profile (`/profile`)**
    - Connected seller profile page for **Greg Wientjes** showcasing bio, profile info, and active Marketplace listings.
@@ -70,8 +68,8 @@ Open `http://localhost:3000` in your browser.
 │   │   ├── category/[slug]/page.tsx      # Dynamic category browse page
 │   │   ├── category/electronics/page.tsx # Static Electronics category example page
 │   │   ├── create/page.tsx               # Listing type chooser
-│   │   ├── create/item/page.tsx          # Create / batch-create / edit item form + live preview
-│   │   ├── item/[id]/page.tsx            # Item detail, edit/delete, & Message Seller
+│   │   ├── create/item/page.tsx          # Create & batch-create item form + live preview
+│   │   ├── item/[id]/page.tsx            # Item detail & Message Seller
 │   │   ├── profile/page.tsx              # Seller Profile page
 │   │   ├── globals.css                   # Theme variables & .fb-shimmer keyframes
 │   │   ├── layout.tsx                    # Root layout (Geist font & #F0F2F5 canvas)

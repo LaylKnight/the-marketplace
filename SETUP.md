@@ -72,8 +72,8 @@ This script configures everything automatically:
 - **`listings` table:** Stores item listings (`id`, `title`, `description`, `price`, `category`, `seller_name`, `seller_email`, `image_url`, `location`, `created_at`, `updated_at`) plus an `update_updated_at_column()` trigger.
 - **`messages` table:** Stores buyer-to-seller messages (`id`, `listing_id`, `buyer_email`, `seller_email`, `message`, `created_at`) with `ON DELETE CASCADE`.
 - **`notifications` table:** Stores seller notification notices (`id`, `listing_id`, `message_id`, `seller_email`, `listing_title`, `notice`, `is_read`, `created_at`) with `ON DELETE CASCADE`.
-- **`listing-images` Storage Bucket:** Creates a public bucket with `SELECT`, `INSERT`, and `DELETE` policies on `storage.objects`.
-- **Row Level Security (RLS):** Enables public `SELECT`/`INSERT`/`UPDATE`/`DELETE` policies for no-login demo access.
+- **`listing-images` Storage Bucket:** Creates a public bucket with `SELECT` and `INSERT` policies on `storage.objects`.
+- **Row Level Security (RLS):** Enables public `SELECT`/`INSERT` policies for listings and messages, and `SELECT`/`INSERT`/`UPDATE` policies for notifications.
 - **Realtime:** Adds `notifications` to `supabase_realtime` (`ALTER PUBLICATION supabase_realtime ADD TABLE notifications;`) so new messages appear in the header bell without refreshing.
 
 ---

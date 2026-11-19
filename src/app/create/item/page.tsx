@@ -18,10 +18,8 @@ import {
 } from "@/lib/categories";
 import {
   createListing,
-  fetchListingById,
   formatPrice,
   getSavedSellerEmail,
-  updateListing,
 } from "@/lib/marketplace-store";
 import { MAX_IMAGE_SIZE_LABEL, validateImageFile } from "@/lib/security";
 
@@ -33,9 +31,7 @@ const LOGGED_IN_SELLER = {
 function CreateItemFormInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const editListingId = searchParams.get("edit");
-  const isEditMode = Boolean(editListingId);
-  const isMultipleMode = !isEditMode && searchParams.get("mode") === "multiple";
+  const isMultipleMode = searchParams.get("mode") === "multiple";
   const initialCategorySlug = searchParams.get("category");
   const initialCategory =
     getCategoryBySlug(initialCategorySlug)?.name ?? "Electronics";
@@ -47,15 +43,9 @@ function CreateItemFormInner() {
   const [location, setLocation] = React.useState("Palo Alto, CA");
   const [description, setDescription] = React.useState("");
   const [imageFile, setImageFile] = React.useState<File | null>(null);
-  const [existingImageUrl, setExistingImageUrl] = React.useState<string | null>(
-    null
-  );
-  const [removeExistingImage, setRemoveExistingImage] = React.useState(false);
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(
     null
   );
-  const [isLoadingExisting, setIsLoadingExisting] =
-    React.useState(isEditMode);
   const [isDragging, setIsDragging] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -66,42 +56,9 @@ function CreateItemFormInner() {
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   React.useEffect(() => {
-    if (!editListingId) {
-      const saved = getSavedSellerEmail();
-      if (saved) setSellerEmail(saved);
-      setIsLoadingExisting(false);
-      return;
-    }
-
-    let cancelled = false;
-    async function loadExisting() {
-      setIsLoadingExisting(true);
-      const result = await fetchListingById(editListingId!);
-      if (cancelled) return;
-      if (result.error || !result.listing) {
-        setError(result.error ?? "Listing not found.");
-        setIsLoadingExisting(false);
-        return;
-      }
-
-      const item = result.listing;
-      setTitle(item.title);
-      setPrice(String(item.price));
-      setCategory(item.category);
-      setSellerEmail(item.seller_email || "");
-      setLocation(item.location || "Palo Alto, CA");
-      setDescription(item.description ?? "");
-      setExistingImageUrl(item.image_url);
-      setImagePreviewUrl(item.image_url);
-      setRemoveExistingImage(false);
-      setIsLoadingExisting(false);
-    }
-
-    void loadExisting();
-    return () => {
-      cancelled = true;
-    };
-  }, [editListingId]);
+    const saved = getSavedSellerEmail();
+    if (saved) setSellerEmail(saved);
+  }, []);
 
   React.useEffect(() => {
     return () => {
@@ -126,7 +83,6 @@ function CreateItemFormInner() {
     }
 
     setImageFile(file);
-    setRemoveExistingImage(false);
     setImagePreviewUrl(URL.createObjectURL(file));
   }
 
@@ -136,9 +92,6 @@ function CreateItemFormInner() {
     }
     setImageFile(null);
     setImagePreviewUrl(null);
-    if (existingImageUrl) {
-      setRemoveExistingImage(true);
-    }
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -170,29 +123,6 @@ function CreateItemFormInner() {
     }
 
     setIsSubmitting(true);
-    if (isEditMode && editListingId) {
-      const result = await updateListing(editListingId, {
-        title: title.trim(),
-        description: description.trim(),
-        price: parsedPrice,
-        category,
-        seller_email: sellerEmail.trim(),
-        location: location.trim() || "Palo Alto, CA",
-        imageFile,
-        removeImage: removeExistingImage,
-        existingImageUrl,
-      });
-      setIsSubmitting(false);
-
-      if (result.error || !result.listing) {
-        setError(result.error ?? "Failed to update listing.");
-        return;
-      }
-
-      router.push(`/item/${result.listing.id}`);
-      return;
-    }
-
     const result = await createListing({
       title: title.trim(),
       description: description.trim(),
@@ -248,7 +178,7 @@ function CreateItemFormInner() {
             </span>
           </Link>
           <Link
-            href={isEditMode && editListingId ? `/item/${editListingId}` : "/create"}
+            href="/create"
             className="inline-flex items-center gap-1 text-xs font-medium text-[#65676B] hover:text-[#1C1E21]"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
@@ -259,11 +189,7 @@ function CreateItemFormInner() {
         <div className="mt-4 flex items-center justify-between gap-3">
           <div>
             <h1 className="text-lg font-bold text-[#1C1E21]">
-              {isEditMode
-                ? "Edit listing"
-                : isMultipleMode
-                  ? "Create multiple listings"
-                  : "Item for sale"}
+              {isMultipleMode ? "Create multiple listings" : "Item for sale"}
             </h1>
             {isMultipleMode && (
               <p className="text-xs text-[#65676B]">
@@ -518,21 +444,17 @@ function CreateItemFormInner() {
 
           <button
             type="submit"
-            disabled={isSubmitting || isLoadingExisting}
+            disabled={isSubmitting}
             className="mt-2 flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1877F2] text-sm font-semibold text-white shadow-sm hover:bg-[#166FE5] disabled:opacity-60 transition-colors"
           >
             {isSubmitting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
-                <span>{isEditMode ? "Saving..." : "Publishing..."}</span>
+                <span>Publishing...</span>
               </>
             ) : (
               <span>
-                {isEditMode
-                  ? "Save changes"
-                  : isMultipleMode
-                    ? "Publish & Add Another"
-                    : "Next"}
+                {isMultipleMode ? "Publish & Add Another" : "Next"}
               </span>
             )}
           </button>

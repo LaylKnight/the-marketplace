@@ -2,23 +2,20 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
   Loader2,
   MapPin,
-  Pencil,
   Send,
   Tag,
-  Trash2,
   User,
 } from "lucide-react";
 import { MarketplaceHeader } from "@/components/layout/header";
 import { getCategoryByName } from "@/lib/categories";
 import {
-  deleteListing,
   fetchListingById,
   formatPrice,
   formatRelativeTime,
@@ -27,17 +24,12 @@ import {
 } from "@/lib/marketplace-store";
 
 export default function ItemDetailPage() {
-  const router = useRouter();
   const params = useParams<{ id: string }>();
   const listingId = typeof params?.id === "string" ? params.id : "";
 
   const [listing, setListing] = React.useState<Listing | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [loadError, setLoadError] = React.useState<string | null>(null);
-
-  const [confirmDelete, setConfirmDelete] = React.useState(false);
-  const [isDeleting, setIsDeleting] = React.useState(false);
-  const [deleteError, setDeleteError] = React.useState<string | null>(null);
 
   const [buyerEmail, setBuyerEmail] = React.useState("");
   const [message, setMessage] = React.useState("I want to buy this item!");
@@ -114,21 +106,6 @@ export default function ItemDetailPage() {
     setMessage("");
   }
 
-  async function handleDeleteListing() {
-    if (!listing) return;
-    setDeleteError(null);
-    setIsDeleting(true);
-    const result = await deleteListing(listing.id, listing.image_url);
-    setIsDeleting(false);
-
-    if (!result.success) {
-      setDeleteError(result.error ?? "Failed to delete listing.");
-      return;
-    }
-
-    router.push("/");
-  }
-
   const categoryObj = getCategoryByName(listing?.category);
 
   return (
@@ -136,7 +113,7 @@ export default function ItemDetailPage() {
       <MarketplaceHeader />
 
       <main className="mx-auto max-w-[1600px] px-4 py-6 sm:px-6">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mb-4">
           <Link
             href="/"
             className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-medium text-[#1C1E21] border border-[#CED0D4] hover:bg-[#F0F2F5] transition-colors"
@@ -144,72 +121,7 @@ export default function ItemDetailPage() {
             <ArrowLeft className="h-4 w-4" />
             <span>Back to Marketplace</span>
           </Link>
-
-          {listing && !isLoading && (
-            <div className="flex items-center gap-2">
-              <Link
-                href={`/create/item?edit=${listing.id}`}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-sm font-semibold text-[#1C1E21] border border-[#CED0D4] hover:bg-[#E4E6EB] transition-colors"
-              >
-                <Pencil className="h-4 w-4" />
-                <span>Edit</span>
-              </Link>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteError(null);
-                  setConfirmDelete((prev) => !prev);
-                }}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3.5 py-1.5 text-sm font-semibold text-red-600 border border-red-200 hover:bg-red-50 transition-colors"
-              >
-                <Trash2 className="h-4 w-4" />
-                <span>Delete</span>
-              </button>
-            </div>
-          )}
         </div>
-
-        {confirmDelete && listing && (
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
-            <div>
-              <p className="font-semibold">Delete &ldquo;{listing.title}&rdquo;?</p>
-              <p className="text-xs text-red-700">
-                This will permanently remove the listing and its uploaded image.
-              </p>
-              {deleteError && (
-                <p className="mt-1 text-xs font-semibold text-red-700">
-                  {deleteError}
-                </p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setConfirmDelete(false)}
-                className="rounded-lg bg-white px-3 py-1.5 text-xs font-semibold text-[#1C1E21] border border-[#CED0D4] hover:bg-[#F0F2F5]"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => void handleDeleteListing()}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-red-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-700 disabled:opacity-60"
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <span>Confirm Delete</span>
-                )}
-              </button>
-            </div>
-          </div>
-        )}
 
         {isLoading ? (
           <div

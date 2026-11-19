@@ -60,12 +60,7 @@ BEGIN
     FOR SELECT USING (bucket_id = 'listing-images');
   END IF;
 
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can delete listing images' AND tablename = 'objects'
-  ) THEN
-    CREATE POLICY "Anyone can delete listing images" ON storage.objects
-    FOR DELETE USING (bucket_id = 'listing-images');
-  END IF;
+  DROP POLICY IF EXISTS "Anyone can delete listing images" ON storage.objects;
 END $$;
 
 -- Create indexes for better performance
@@ -95,18 +90,14 @@ BEGIN
     CREATE POLICY "Anyone can create listings" ON listings FOR INSERT WITH CHECK (true);
   END IF;
 
-  DROP POLICY IF EXISTS "Users can update their own listings" ON listings;
+  DROP POLICY IF EXISTS "Anyone can update listings" ON listings;
+  DROP POLICY IF EXISTS "Anyone can delete listings" ON listings;
 
   IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can update listings' AND tablename = 'listings'
+    SELECT 1 FROM pg_policies WHERE policyname = 'Users can update their own listings' AND tablename = 'listings'
   ) THEN
-    CREATE POLICY "Anyone can update listings" ON listings FOR UPDATE USING (true);
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_policies WHERE policyname = 'Anyone can delete listings' AND tablename = 'listings'
-  ) THEN
-    CREATE POLICY "Anyone can delete listings" ON listings FOR DELETE USING (true);
+    CREATE POLICY "Users can update their own listings" ON listings FOR UPDATE
+    USING (seller_email = current_setting('request.jwt.claims', true)::json->>'email');
   END IF;
 END $$;
 
