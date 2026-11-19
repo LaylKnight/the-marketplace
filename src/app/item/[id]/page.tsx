@@ -45,6 +45,19 @@ export default function ItemDetailPage() {
   const [sendError, setSendError] = React.useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = React.useState(false);
 
+  const mainImgRef = React.useRef<HTMLImageElement | null>(null);
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
+
+  React.useEffect(() => {
+    setImageError(false);
+    setImageLoaded(
+      Boolean(
+        mainImgRef.current?.complete && mainImgRef.current?.naturalWidth > 0
+      )
+    );
+  }, [listing?.image_url]);
+
   React.useEffect(() => {
     let cancelled = false;
 
@@ -199,13 +212,48 @@ export default function ItemDetailPage() {
         )}
 
         {isLoading ? (
-          <div className="rounded-2xl bg-white border border-[#CED0D4] p-6 flex flex-col lg:flex-row gap-6 animate-pulse">
-            <div className="flex-1 min-h-[400px] lg:min-h-[580px] rounded-xl bg-[#E4E6EB]" />
-            <div className="w-full lg:w-[400px] shrink-0 space-y-4">
-              <div className="h-7 w-2/3 rounded bg-[#E4E6EB]" />
-              <div className="h-6 w-1/4 rounded bg-[#E4E6EB]" />
-              <div className="h-4 w-1/2 rounded bg-[#E4E6EB]" />
-              <div className="h-28 w-full rounded bg-[#E4E6EB]" />
+          <div
+            aria-busy="true"
+            aria-label="Loading listing details"
+            className="overflow-hidden rounded-2xl bg-white border border-[#CED0D4] shadow-sm flex flex-col lg:flex-row"
+          >
+            <div className="flex-1 min-h-[360px] lg:min-h-[620px] p-6 sm:p-10 bg-[#F0F2F5] flex items-center justify-center border-b lg:border-b-0 lg:border-r border-[#CED0D4]">
+              <div className="h-[320px] sm:h-[440px] w-full max-w-[520px] rounded-xl fb-shimmer" />
+            </div>
+            <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0 p-6 flex flex-col justify-between gap-6">
+              <div className="space-y-4">
+                <div className="space-y-2.5">
+                  <div className="h-7 w-3/4 rounded-lg fb-shimmer" />
+                  <div className="h-7 w-1/3 rounded-lg fb-shimmer" />
+                </div>
+                <div className="h-4 w-1/2 rounded fb-shimmer" />
+                <div className="flex gap-2">
+                  <div className="h-6 w-24 rounded-full fb-shimmer" />
+                  <div className="h-6 w-28 rounded-full fb-shimmer" />
+                </div>
+                <div className="border-t border-[#CED0D4]/70 pt-4 space-y-2">
+                  <div className="h-4 w-20 rounded fb-shimmer" />
+                  <div className="h-3.5 w-full rounded fb-shimmer" />
+                  <div className="h-3.5 w-5/6 rounded fb-shimmer" />
+                  <div className="h-3.5 w-2/3 rounded fb-shimmer" />
+                </div>
+                <div className="border-t border-[#CED0D4]/70 pt-4">
+                  <div className="h-4 w-32 rounded fb-shimmer mb-3" />
+                  <div className="flex items-center gap-3">
+                    <div className="h-10 w-10 rounded-full fb-shimmer shrink-0" />
+                    <div className="space-y-1.5 flex-1">
+                      <div className="h-4 w-32 rounded fb-shimmer" />
+                      <div className="h-3 w-24 rounded fb-shimmer" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="border-t border-[#CED0D4]/70 pt-5 space-y-3">
+                <div className="h-4 w-40 rounded fb-shimmer" />
+                <div className="h-10 w-full rounded-lg fb-shimmer" />
+                <div className="h-24 w-full rounded-lg fb-shimmer" />
+                <div className="h-10 w-full rounded-lg fb-shimmer" />
+              </div>
             </div>
           </div>
         ) : loadError || !listing ? (
@@ -229,24 +277,39 @@ export default function ItemDetailPage() {
           <div className="overflow-hidden rounded-2xl bg-white border border-[#CED0D4] shadow-sm flex flex-col lg:flex-row">
             {/* Left: Full-width stage with blurred background + crisp centered photo */}
             <div className="relative flex-1 overflow-hidden bg-[#18191A] flex items-center justify-center p-6 sm:p-10 min-h-[360px] lg:min-h-[620px] border-b lg:border-b-0 lg:border-r border-[#CED0D4]">
-              {listing.image_url ? (
+              {listing.image_url && !imageError ? (
                 <>
+                  {!imageLoaded && (
+                    <div
+                      aria-hidden="true"
+                      className="absolute inset-0 z-20 fb-shimmer"
+                    />
+                  )}
                   <img
                     src={listing.image_url}
                     alt=""
                     aria-hidden="true"
-                    className="absolute inset-0 h-full w-full object-cover scale-110 blur-2xl opacity-65 select-none pointer-events-none"
+                    className={`absolute inset-0 h-full w-full object-cover scale-110 blur-2xl select-none pointer-events-none transition-opacity duration-500 ${
+                      imageLoaded ? "opacity-65" : "opacity-0"
+                    }`}
                   />
                   <img
+                    ref={mainImgRef}
                     src={listing.image_url}
                     alt={listing.title}
-                    className="relative z-10 max-h-[480px] max-w-[82%] w-auto object-contain rounded-lg shadow-2xl"
+                    loading="lazy"
+                    decoding="async"
+                    onLoad={() => setImageLoaded(true)}
+                    onError={() => setImageError(true)}
+                    className={`relative z-10 max-h-[480px] max-w-[82%] w-auto object-contain rounded-lg shadow-2xl transition-opacity duration-300 ${
+                      imageLoaded ? "opacity-100" : "opacity-0"
+                    }`}
                   />
                 </>
               ) : (
                 <div className="marketplace-placeholder-pattern flex h-full w-full min-h-[360px] items-center justify-center">
                   <span className="text-sm font-medium text-[#1877F2]">
-                    No photo provided
+                    {imageError ? "Photo unavailable" : "No photo provided"}
                   </span>
                 </div>
               )}

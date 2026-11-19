@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ImageOff, MapPin, Plus } from "lucide-react";
+import { LazyImage } from "@/components/marketplace/lazy-image";
 import {
   type Listing,
   formatPrice,
@@ -25,14 +26,52 @@ export function ItemGrid({
   emptyDescription = "Be the first to post an item in this category!",
 }: ItemGridProps) {
   if (isLoading) {
+    if (viewMode === "list") {
+      return (
+        <div className="space-y-3" aria-busy="true" aria-label="Loading listings">
+          {Array.from({ length: 6 }).map((_, idx) => (
+            <div
+              key={idx}
+              className="flex flex-col sm:flex-row gap-4 rounded-xl bg-white p-3 border border-[#CED0D4]/60 shadow-sm"
+            >
+              <div className="h-44 sm:h-32 sm:w-32 shrink-0 rounded-lg fb-shimmer" />
+              <div className="flex flex-1 flex-col justify-between py-1 space-y-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="h-4 w-1/2 rounded fb-shimmer" />
+                    <div className="h-4 w-16 rounded fb-shimmer" />
+                  </div>
+                  <div className="h-3.5 w-5/6 rounded fb-shimmer" />
+                  <div className="h-3.5 w-2/3 rounded fb-shimmer" />
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-24 rounded fb-shimmer" />
+                  <div className="h-3 w-20 rounded fb-shimmer" />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      );
+    }
+
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+      <div
+        className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+        aria-busy="true"
+        aria-label="Loading listings"
+      >
         {Array.from({ length: 10 }).map((_, idx) => (
-          <div key={idx} className="animate-pulse space-y-2.5">
-            <div className="aspect-square w-full rounded-xl bg-[#E4E6EB]" />
-            <div className="h-4 w-1/3 rounded bg-[#E4E6EB]" />
-            <div className="h-3.5 w-3/4 rounded bg-[#E4E6EB]" />
-            <div className="h-3 w-1/2 rounded bg-[#E4E6EB]" />
+          <div
+            key={idx}
+            className="rounded-xl bg-white p-2 border border-[#CED0D4]/60 shadow-sm space-y-2.5"
+          >
+            <div className="aspect-square w-full rounded-lg fb-shimmer" />
+            <div className="px-1 pb-1 space-y-2">
+              <div className="h-4 w-1/3 rounded fb-shimmer" />
+              <div className="h-3.5 w-3/4 rounded fb-shimmer" />
+              <div className="h-3 w-1/2 rounded fb-shimmer" />
+            </div>
           </div>
         ))}
       </div>
@@ -71,7 +110,7 @@ export function ItemGrid({
           >
             <div className="h-44 sm:h-32 sm:w-32 shrink-0 overflow-hidden rounded-lg border border-[#CED0D4]/60 bg-[#F0F2F5]">
               {item.image_url ? (
-                <img
+                <LazyImage
                   src={item.image_url}
                   alt={item.title}
                   className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -123,7 +162,7 @@ export function ItemGrid({
         >
           <div className="aspect-square w-full overflow-hidden rounded-lg border border-[#CED0D4]/60 bg-[#F0F2F5]">
             {item.image_url ? (
-              <img
+              <LazyImage
                 src={item.image_url}
                 alt={item.title}
                 className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
