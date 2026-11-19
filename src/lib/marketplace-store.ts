@@ -16,6 +16,9 @@ export interface Listing {
   seller_email: string;
   image_url: string | null;
   location: string;
+  status?: "available" | "sold";
+  sold_at?: string | null;
+  seller_stripe_onboarded?: boolean;
   created_at: string;
   updated_at?: string;
 }
@@ -253,6 +256,8 @@ function normalizeListingRow(row: Record<string, unknown>): Listing {
     seller_email: String(row.seller_email ?? ""),
     image_url: imageUrl,
     location: sanitizeTextInput(String(row.location ?? "Palo Alto, CA")),
+    status: row.status === "sold" ? "sold" : "available",
+    sold_at: typeof row.sold_at === "string" ? row.sold_at : null,
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at:
       typeof row.updated_at === "string" ? row.updated_at : undefined,
@@ -271,7 +276,7 @@ export async function fetchListings(options?: {
     let query = supabase
       .from("listings")
       .select(
-        "id, title, description, price, category, seller_name, seller_email, image_url, location, created_at, updated_at"
+        "id, title, description, price, category, seller_name, seller_email, image_url, location, status, sold_at, created_at, updated_at"
       )
       .order("created_at", { ascending: false });
 
@@ -290,6 +295,24 @@ export async function fetchListings(options?: {
     let listings = (data ?? []).map((row) =>
       normalizeListingRow(row as Record<string, unknown>)
     );
+
+    const { data: onboardedSellers } = await supabase
+      .from("seller_accounts")
+      .select("seller_email, onboarding_complete, charges_enabled");
+
+    if (onboardedSellers && onboardedSellers.length > 0) {
+      const readyEmails = new Set(
+        onboardedSellers
+          .filter((s) => s.charges_enabled || s.onboarding_complete)
+          .map((s) => String(s.seller_email).toLowerCase())
+      );
+      listings = listings.map((item) => ({
+        ...item,
+        seller_stripe_onboarded: readyEmails.has(
+          item.seller_email.toLowerCase()
+        ),
+      }));
+    }
 
     if (search) {
       listings = listings.filter(
@@ -336,7 +359,7 @@ export async function fetchListingById(
     const { data, error } = await supabase
       .from("listings")
       .select(
-        "id, title, description, price, category, seller_name, seller_email, image_url, location, created_at, updated_at"
+        "id, title, description, price, category, seller_name, seller_email, image_url, location, status, sold_at, created_at, updated_at"
       )
       .eq("id", id)
       .maybeSingle();
@@ -347,8 +370,20 @@ export async function fetchListingById(
     if (!data) {
       return { listing: null, error: null };
     }
+
+    const normalized = normalizeListingRow(data as Record<string, unknown>);
+    const { data: sellerAccount } = await supabase
+      .from("seller_accounts")
+      .select("onboarding_complete, charges_enabled")
+      .ilike("seller_email", normalized.seller_email)
+      .maybeSingle();
+
+    normalized.seller_stripe_onboarded = Boolean(
+      sellerAccount?.charges_enabled || sellerAccount?.onboarding_complete
+    );
+
     return {
-      listing: normalizeListingRow(data as Record<string, unknown>),
+      listing: normalized,
       error: null,
     };
   }

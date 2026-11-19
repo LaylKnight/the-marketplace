@@ -395,6 +395,16 @@ function CreateItemFormInner() {
               placeholder="you@example.com"
               className="h-10 w-full rounded-lg border border-[#CED0D4] bg-white px-3 text-sm text-[#1C1E21] focus:border-[#1877F2] focus:outline-none focus:ring-1 focus:ring-[#1877F2]"
             />
+            <p className="mt-1 text-[11px] text-[#65676B]">
+              Want buyers to pay online?{" "}
+              <Link
+                href="/connect"
+                className="font-semibold text-[#1877F2] hover:underline"
+              >
+                Connect with Stripe
+              </Link>{" "}
+              using this email.
+            </p>
           </div>
 
           {/* Location */}

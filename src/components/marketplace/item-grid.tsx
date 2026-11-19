@@ -108,7 +108,7 @@ export function ItemGrid({
             href={`/item/${item.id}`}
             className="group flex flex-col sm:flex-row gap-4 rounded-xl bg-white p-3 border border-[#CED0D4]/80 shadow-sm hover:shadow-md hover:border-[#1877F2]/40 transition-all"
           >
-            <div className="h-44 sm:h-32 sm:w-32 shrink-0 overflow-hidden rounded-lg border border-[#CED0D4]/60 bg-[#F0F2F5]">
+            <div className="relative h-44 sm:h-32 sm:w-32 shrink-0 overflow-hidden rounded-lg border border-[#CED0D4]/60 bg-[#F0F2F5]">
               {item.image_url ? (
                 <LazyImage
                   src={item.image_url}
@@ -119,6 +119,11 @@ export function ItemGrid({
                 <div className="marketplace-placeholder-pattern flex h-full w-full items-center justify-center text-xs font-medium text-[#1877F2]">
                   No photo
                 </div>
+              )}
+              {item.status === "sold" && (
+                <span className="absolute left-2 top-2 z-10 rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow">
+                  Sold
+                </span>
               )}
             </div>
             <div className="flex flex-1 flex-col justify-between py-0.5">
@@ -160,7 +165,7 @@ export function ItemGrid({
           href={`/item/${item.id}`}
           className="group flex flex-col rounded-xl bg-white p-2 border border-transparent hover:border-[#CED0D4] hover:shadow-md transition-all"
         >
-          <div className="aspect-square w-full overflow-hidden rounded-lg border border-[#CED0D4]/60 bg-[#F0F2F5]">
+          <div className="relative aspect-square w-full overflow-hidden rounded-lg border border-[#CED0D4]/60 bg-[#F0F2F5]">
             {item.image_url ? (
               <LazyImage
                 src={item.image_url}
@@ -172,6 +177,15 @@ export function ItemGrid({
                 No photo
               </div>
             )}
+            {item.status === "sold" ? (
+              <span className="absolute left-2 top-2 z-10 rounded-md bg-red-600 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white shadow">
+                Sold
+              </span>
+            ) : item.seller_stripe_onboarded ? (
+              <span className="absolute left-2 top-2 z-10 rounded-md bg-[#1877F2]/90 px-2 py-0.5 text-[10px] font-semibold text-white shadow">
+                Buy Now
+              </span>
+            ) : null}
           </div>
 
           <div className="px-1 pt-2.5 pb-1">

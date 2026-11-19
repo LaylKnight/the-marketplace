@@ -8,6 +8,7 @@ import {
   Car,
   ChevronDown,
   Clapperboard,
+  CreditCard,
   Gamepad2,
   Heart,
   Home,
@@ -155,6 +156,14 @@ export function MarketplaceSidebar({
               <span>Create new listing</span>
             </Link>
           </div>
+
+          <Link
+            href="/connect"
+            className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-[#635BFF]/30 bg-[#635BFF]/10 px-3 text-sm font-semibold text-[#5249F5] hover:bg-[#635BFF]/15 transition-colors"
+          >
+            <CreditCard className="h-4 w-4" />
+            <span>Connect with Stripe</span>
+          </Link>
         </div>
 
         <div className="w-full overflow-x-auto pb-2 border-b border-[#CED0D4]">
@@ -198,14 +207,22 @@ export function MarketplaceSidebar({
       {/* Desktop Left Sidebar matching Facebook Marketplace reference */}
       <aside className="hidden lg:block w-80 shrink-0">
         <div className="sticky top-[72px] max-h-[calc(100vh-88px)] flex flex-col overflow-hidden rounded-xl bg-white border border-[#CED0D4]/80 shadow-sm">
-          {/* Sticky Top: Create new listing + Search input */}
-          <div className="sticky top-0 z-10 bg-white p-4 pb-3 border-b border-[#CED0D4]/70 space-y-3 shrink-0">
+          {/* Sticky Top: Create new listing + Connect Stripe + Search input */}
+          <div className="sticky top-0 z-10 bg-white p-4 pb-3 border-b border-[#CED0D4]/70 space-y-2.5 shrink-0">
             <Link
               href="/create"
               className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1877F2] px-3 text-sm font-semibold text-white shadow-sm hover:bg-[#166FE5] transition-colors"
             >
               <Plus className="h-4 w-4 shrink-0" />
               <span>Create new listing</span>
+            </Link>
+
+            <Link
+              href="/connect"
+              className="flex h-9 w-full items-center justify-center gap-2 rounded-lg border border-[#635BFF]/30 bg-[#635BFF]/10 px-3 text-sm font-semibold text-[#5249F5] hover:bg-[#635BFF]/15 transition-colors"
+            >
+              <CreditCard className="h-4 w-4 shrink-0" />
+              <span>Connect with Stripe</span>
             </Link>
 
             <div className="relative">

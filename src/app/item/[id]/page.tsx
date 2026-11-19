@@ -7,6 +7,7 @@ import {
   AlertCircle,
   ArrowLeft,
   CheckCircle2,
+  CreditCard,
   Loader2,
   MapPin,
   Send,
@@ -36,6 +37,9 @@ export default function ItemDetailPage() {
   const [isSending, setIsSending] = React.useState(false);
   const [sendError, setSendError] = React.useState<string | null>(null);
   const [sendSuccess, setSendSuccess] = React.useState(false);
+
+  const [isBuying, setIsBuying] = React.useState(false);
+  const [buyError, setBuyError] = React.useState<string | null>(null);
 
   const mainImgRef = React.useRef<HTMLImageElement | null>(null);
   const [imageLoaded, setImageLoaded] = React.useState(false);
@@ -104,6 +108,29 @@ export default function ItemDetailPage() {
 
     setSendSuccess(true);
     setMessage("");
+  }
+
+  async function handleBuyNow() {
+    if (!listing) return;
+    setBuyError(null);
+    setIsBuying(true);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ listingId: listing.id }),
+      });
+      const data = (await res.json()) as { url?: string; error?: string };
+      if (!res.ok || !data.url) {
+        setBuyError(data.error ?? "Unable to start Stripe Checkout.");
+        setIsBuying(false);
+        return;
+      }
+      window.location.href = data.url;
+    } catch {
+      setBuyError("Network error starting checkout.");
+      setIsBuying(false);
+    }
   }
 
   const categoryObj = getCategoryByName(listing?.category);
@@ -231,13 +258,60 @@ export default function ItemDetailPage() {
             <div className="w-full lg:w-[400px] xl:w-[420px] shrink-0 p-6 flex flex-col justify-between gap-6">
               <div className="space-y-4">
                 <div>
-                  <h1 className="text-2xl font-bold text-[#1C1E21] break-words">
-                    {listing.title}
-                  </h1>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h1 className="text-2xl font-bold text-[#1C1E21] break-words">
+                      {listing.title}
+                    </h1>
+                    {listing.status === "sold" && (
+                      <span className="rounded-md bg-red-600 px-2.5 py-0.5 text-xs font-bold uppercase tracking-wide text-white">
+                        Sold
+                      </span>
+                    )}
+                  </div>
                   <p className="mt-1 text-2xl font-bold text-[#1C1E21]">
                     {formatPrice(listing.price)}
                   </p>
                 </div>
+
+                {/* Buy Now / Sold Status */}
+                {listing.status === "sold" ? (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+                    This item has been sold and is no longer available for
+                    purchase.
+                  </div>
+                ) : listing.seller_stripe_onboarded && listing.price > 0 ? (
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      disabled={isBuying}
+                      onClick={() => void handleBuyNow()}
+                      className="flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#1877F2] text-sm font-semibold text-white shadow-sm hover:bg-[#166FE5] disabled:opacity-60 transition-colors"
+                    >
+                      {isBuying ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>Redirecting to Checkout...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CreditCard className="h-4 w-4" />
+                          <span>Buy Now · {formatPrice(listing.price)}</span>
+                        </>
+                      )}
+                    </button>
+                    {buyError && (
+                      <div className="flex items-start gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                        <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
+                        <span>{buyError}</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-[#CED0D4] bg-[#F8F9FB] px-3.5 py-2.5 text-xs text-[#65676B]">
+                    Online checkout unavailable — seller hasn&apos;t connected
+                    Stripe yet. Message the seller below to coordinate.
+                  </div>
+                )}
 
                 <div className="flex flex-wrap items-center gap-2 text-xs text-[#65676B]">
                   <span>
