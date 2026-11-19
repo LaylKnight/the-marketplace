@@ -448,7 +448,7 @@ export default function ItemDetailPage() {
                     <button
                       type="submit"
                       disabled={isSending}
-                      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#1877F2] text-sm font-semibold text-white shadow-sm hover:bg-[#166FE5] disabled:opacity-60 transition-colors"
+                      className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-[#CED0D4] bg-transparent text-sm font-semibold text-[#1C1E21] hover:bg-[#F0F2F5] disabled:opacity-60 transition-colors"
                     >
                       {isSending ? (
                         <>
