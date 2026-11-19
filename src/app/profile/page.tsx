@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   AlertCircle,
   ArrowLeft,
+  CreditCard,
   GraduationCap,
   MapPin,
   Plus,
@@ -133,6 +134,22 @@ export default function SellerProfilePage() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            {/* Settings Card */}
+            <div className="rounded-xl bg-white border border-[#CED0D4] shadow-sm p-4 space-y-3">
+              <h3 className="text-base font-bold text-[#1C1E21]">Settings</h3>
+              <p className="text-xs text-[#65676B]">
+                Connect your Stripe account to accept Buy Now payments on your
+                listings.
+              </p>
+              <Link
+                href="/connect"
+                className="flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#635BFF] px-3 text-sm font-semibold text-white shadow-sm hover:bg-[#5249F5] transition-colors"
+              >
+                <CreditCard className="h-4 w-4 shrink-0" />
+                <span>Connect with Stripe</span>
+              </Link>
             </div>
           </aside>
 
