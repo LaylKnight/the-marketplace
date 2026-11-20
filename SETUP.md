@@ -53,6 +53,11 @@ SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
 SMTP_USER=your-email@gmail.com
 SMTP_PASS=your16charapppassword
+
+# Stripe Connect (Sandbox / Test Mode)
+STRIPE_SECRET_KEY=sk_test_your_secret_key
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 ```
 
 ### Where to Find Your Supabase Keys
@@ -113,7 +118,24 @@ npx supabase functions deploy send-message-email
 
 ---
 
-## 7. Deploying to Vercel
+## 7. Stripe Connect Setup (Sandbox / Test Mode)
+
+The `stripe` SDK is already installed in `package.json`.
+
+1. Add `STRIPE_SECRET_KEY` (`sk_test_...`) and `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` (`pk_test_...`) to `.env.local` and your Vercel **Environment Variables**.
+2. Make sure [`supabase/schema.sql`](./supabase/schema.sql) has been run in your Supabase SQL Editor (this creates `seller_accounts`, `orders`, and adds `status` / `sold_at` to `listings`).
+3. **Registering a Webhook Endpoint (Optional for `/checkout/success`, Recommended for Production):**
+   - Deploy your app to Vercel first.
+   - Update `NEXT_PUBLIC_APP_URL` (or edit `scripts/create-webhook.mjs`) with your production Vercel URL, then run:
+     ```bash
+     node --env-file=.env.local scripts/create-webhook.mjs
+     ```
+   - Save the printed `whsec_...` value as `STRIPE_WEBHOOK_SECRET` in `.env.local` and Vercel, then redeploy.
+   - *(Note: Even without `STRIPE_WEBHOOK_SECRET`, `/checkout/success` verifies paid sessions via `/api/stripe/session`, records the order in `orders`, and marks the listing as `sold`.)*
+
+---
+
+## 8. Deploying to Vercel
 
 1. Push your repository to GitHub (make sure [`fix-realpath.cjs`](./fix-realpath.cjs) and [`tsconfig.json`](./tsconfig.json) are committed).
 2. Import the repository in **[Vercel](https://vercel.com)**.

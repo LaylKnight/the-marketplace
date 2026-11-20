@@ -80,8 +80,15 @@ A complete reference of every user-facing feature and workflow in the Marketplac
 
 ---
 
-## 6. Seller Profile (`/profile`)
+## 6. Seller Profile & Stripe Connect (`/profile`, `/connect`)
 
-- Styled to match the Marketplace design (`#F0F2F5` canvas, rounded-xl white cards, `#CED0D4` borders, `#1877F2` icon accents).
-- Left sidebar displays **Greg Wientjes**' portrait (`/greg-profile.png`), **Bio**, and **Information** (**Networks:** `Stanford Alum`, **Current City:** `Palo Alto, CA`).
-- Right section lists all active Marketplace listings posted by Greg Wientjes with **Back to Marketplace** and **Create new listing** actions.
+- **Seller Profile (`/profile`):**
+  - Styled to match the Marketplace design (`#F0F2F5` canvas, rounded-xl white cards, `#CED0D4` borders, `#1877F2` icon accents).
+  - Left sidebar displays **Greg Wientjes**' portrait (`/greg-profile.png`), **Bio**, **Information** (**Networks:** `Stanford Alum`, **Current City:** `Palo Alto, CA`), and a **Settings** card with **Connect with Stripe**.
+  - Right section lists all active Marketplace listings posted by Greg Wientjes with **Back to Marketplace** and **Create new listing** actions.
+- **Stripe Connect Onboarding (`/connect`):**
+  - Sellers enter their listing email, click **Connect with Stripe**, and complete Stripe's hosted onboarding using test data.
+  - Once onboarded, all listings matching that email display a **Buy Now** button on `/item/[id]` (and a **Buy Now** badge on grid cards).
+- **Direct Charge Checkout & Order Confirmation (`/checkout/success`):**
+  - Clicking **Buy Now** opens Stripe Checkout on the seller's connected account with a **10% platform fee** (`application_fee_amount`).
+  - After payment (e.g. test card `4242 4242 4242 4242`), `/checkout/success` confirms the order, saves it in Supabase `orders`, and marks the listing as **Sold**.

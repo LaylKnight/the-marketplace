@@ -37,6 +37,7 @@ Works out of the box with **Supabase** (PostgreSQL + Storage + Realtime) and aut
 - **Framework:** Next.js 15 (App Router), React 19, TypeScript
 - **Styling:** Tailwind CSS, shadcn/ui (`src/components/ui/*`), Lucide Icons, Geist font
 - **Backend / Database:** Supabase (`@supabase/supabase-js`) — PostgreSQL, Storage (`listing-images`), Realtime
+- **Payments:** Stripe Connect (`stripe`) — Sandbox Direct Charges with 10% platform fee & Checkout
 - **Email Delivery:** Node.js built-in `node:tls` / `node:net` SMTP route (`/api/send-email`) + optional Supabase Edge Function (`supabase/functions/send-message-email/index.ts`)
 - **Deployment:** Vercel
 
@@ -65,12 +66,15 @@ Open `http://localhost:3000` in your browser.
 ├── src/
 │   ├── app/
 │   │   ├── api/send-email/route.ts       # SMTP email endpoint with weekly cap & cooldown
+│   │   ├── api/stripe/                   # Stripe Connect, Checkout, Session & Webhook routes
 │   │   ├── category/[slug]/page.tsx      # Dynamic category browse page
 │   │   ├── category/electronics/page.tsx # Static Electronics category example page
+│   │   ├── checkout/success/page.tsx     # Order confirmation & Sold status sync
+│   │   ├── connect/page.tsx              # Seller Stripe Connect onboarding page
 │   │   ├── create/page.tsx               # Listing type chooser
 │   │   ├── create/item/page.tsx          # Create & batch-create item form + live preview
-│   │   ├── item/[id]/page.tsx            # Item detail & Message Seller
-│   │   ├── profile/page.tsx              # Seller Profile page
+│   │   ├── item/[id]/page.tsx            # Item detail, Buy Now, & Message Seller
+│   │   ├── profile/page.tsx              # Seller Profile page & Settings (Connect with Stripe)
 │   │   ├── globals.css                   # Theme variables & .fb-shimmer keyframes
 │   │   ├── layout.tsx                    # Root layout (Geist font & #F0F2F5 canvas)
 │   │   └── page.tsx                      # Marketplace homepage

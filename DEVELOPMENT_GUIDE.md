@@ -26,9 +26,12 @@ Built with **Next.js 15 App Router** and TypeScript:
 | `/category/electronics` | `src/app/category/electronics/page.tsx` | Static | Dedicated Electronics category example route |
 | `/create` | `src/app/create/page.tsx` | Static / Client | Listing type selector |
 | `/create/item` | `src/app/create/item/page.tsx` | Static / Client (`Suspense`) | Create or batch-create (`?mode=multiple`) item form |
-| `/item/[id]` | `src/app/item/[id]/page.tsx` | Dynamic (`useParams`) | Listing detail and Message Seller |
-| `/profile` | `src/app/profile/page.tsx` | Static / Client | Greg Wientjes Seller Profile + active listings |
+| `/item/[id]` | `src/app/item/[id]/page.tsx` | Dynamic (`useParams`) | Listing detail, Buy Now checkout, and Message Seller |
+| `/profile` | `src/app/profile/page.tsx` | Static / Client | Greg Wientjes Seller Profile, Settings, & active listings |
+| `/connect` | `src/app/connect/page.tsx` | Static / Client (`Suspense`) | Seller Stripe Connect onboarding & status check |
+| `/checkout/success` | `src/app/checkout/success/page.tsx` | Static / Client (`Suspense`) | Stripe Checkout order confirmation & Sold sync |
 | `/api/send-email` | `src/app/api/send-email/route.ts` | Node.js API Route | SMTP email delivery with weekly cap & cooldown |
+| `/api/stripe/*` | `src/app/api/stripe/` | Node.js API Routes | Connect, status, Direct Charge checkout, session & webhook |
 
 > [!NOTE]
 > `src/app/create/item/page.tsx` wraps its `useSearchParams()` consumer inside `<React.Suspense>` so Next.js 15 static prerendering succeeds cleanly during `npm run build`.
